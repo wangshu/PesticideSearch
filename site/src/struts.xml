@@ -2,8 +2,8 @@
     "-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"
     "http://struts.apache.org/dtds/struts-2.0.dtd">
 <struts>
-    <package name="cn.com.pesticidesearch.action" extends="struts-default">
-        <action name="doSearch" class="cn.com.pesticidesearch.action.SearchAction">
+    <package name="cn.com.pesticidesearch.pc.action" extends="struts-default">
+        <action name="doSearch" class="cn.com.pesticidesearch.pc.action.SearchAction">
             <result>searchlist.jsp</result>
         </action>
         <!-- Add your actions here -->

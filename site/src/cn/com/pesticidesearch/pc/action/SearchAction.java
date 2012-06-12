@@ -1,4 +1,4 @@
-package cn.com.pesticidesearch.action;
+package cn.com.pesticidesearch.pc.action;
 
 import com.opensymphony.xwork2.ActionSupport;
 
