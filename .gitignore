@@ -3,3 +3,6 @@
 # Package Files #
 
 *.ear
+
+/decode/decode/obj
+/decode/decode/bin
