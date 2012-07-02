@@ -9,11 +9,24 @@ using System.Text;
 using System.Windows.Forms;
 using System.Security.Cryptography;
 using ICSharpCode.SharpZipLib.Zip;
+using System;
+using System.Collections;
+using System.Data;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Management;
+using System.Security.Cryptography;
+using System.Text;
+using System.Windows.Forms;
 namespace decode
 {
     public partial class Form1 : Form
     {
-    
+        private String savepath = "";
+        private String openpath = "";
+        private String psw="nv86^E39%0_~!f3$^@#";
+        private String columns = "R1|R2|HL|F2|R5|F9|F14|R80|F2|F9|F14|E2|E3|C1|C2|BH|CPMC|QYMC|CPMC|FMISPCNAME|E3|";
         public Form1()
         {
             InitializeComponent();
@@ -31,15 +44,25 @@ namespace decode
         }
         private void button1_Click(object sender, EventArgs e)
         {
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            
+            
+            
+            if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
             {
-                for (int i = 0; i < openFileDialog1.FileNames.Length; i++)
+                openpath = folderBrowserDialog1.SelectedPath;
+                DirectoryInfo di = new DirectoryInfo(folderBrowserDialog1.SelectedPath);
+                FileInfo[] files = di.GetFiles("*.dat");                       //扫描文件 GetFiles("*.txt");可以实现扫描扫描txt文件 
+                foreach (FileInfo fi in files)
                 {
-
-                    listBox1.Items.Add(openFileDialog1.FileNames[i]);
-
-                    
+                    try
+                    {
+                        DecryptFile(fi.FullName, Application.CommonAppDataPath +"temp.dat", psw);
+                        listBox1.Items.Add(fi.FullName);
+                    }
+                    catch (Exception ex)
+                    { }
                 }
+                
             }
         }
    
@@ -173,7 +196,7 @@ namespace decode
 
     private void button2_Click(object sender, EventArgs e)
     {
-
+        getInsertSQL();
     }
 
     private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
@@ -182,20 +205,23 @@ namespace decode
         try
         {
             ds.Clear();
-            DecryptFile(filesname, getzipfilename(), "nv86^E39%0_~!f3$^@#");
-            UnZipFile(getzipfilename(), getxmlfilename());
-            ds.ReadXmlSchema(getxmlfilename());
-            comboBox2.Items.Clear();
-            for (int i = 0; i < ds.Tables[0].Columns.Count; i++)
-            {
-                comboBox2.Items.Add(ds.Tables[0].Columns[i].Caption);
-            }
+            ds.Tables.Clear();
+            DecryptFile(filesname, getzipfilename(), psw);
+              String xmlfilename=getxmlfilename();
+              UnZipFile(getzipfilename(), xmlfilename);
+
+              ds.ReadXmlSchema(xmlfilename );
+
+              ds.ReadXml(xmlfilename, XmlReadMode.IgnoreSchema);
+  
+            ds = PlanData(ds, ds.Tables[0].TableName, columns);
             dataGridView1.DataSource = ds.Tables[0];
-            
+            File.Delete(xmlfilename);
+            File.Delete(getzipfilename());
         }
         catch (Exception ex)
         {
-            MessageBox.Show(filesname);
+            MessageBox.Show(filesname +"\t"+ ex.Message);
         }
     }
 
@@ -205,6 +231,84 @@ namespace decode
         { comboBox2.Enabled = true; }
         else
         { comboBox2.Enabled = false; }
+    }
+    private void getInsertSQL()
+    {
+        if (savepath=="")  
+        {
+            if (this.folderBrowserDialog1.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                savepath = this.folderBrowserDialog1.SelectedPath;
+            }
+        }
+   
+        List<String> r=new List<String>();
+        StreamWriter    file =  File.AppendText(savepath+ds.Tables[0].TableName+".sql");
+        for (int j = 0; j < ds.Tables[0].Rows.Count; j++)
+        {
+            String rs = "insert into " + ds.Tables[0].TableName+" (";
+        String column = "";
+        String value = "";
+            for (int i = 0; i < ds.Tables[0].Columns.Count; i++)
+            {
+                column += "  " + ds.Tables[0].Columns[i].ColumnName;
+                value += "'"+ds.Tables[0].Rows[j][i].ToString() +"'";
+                if (i != ds.Tables[0].Columns.Count - 1)
+                {
+                    column += " ,";
+                    value += " ,";
+                }
+
+            }
+
+            rs += column + "  ) values (" + value + " )";
+            file.WriteLine(rs);
+            System.Windows.Forms.Application.DoEvents(); 
+        }
+        file.Flush(); 
+        file.Close();
+        
+    }
+    private string Reverse(string strReverse)
+    {
+        char[] array = strReverse.ToCharArray();
+        Array.Reverse(array);
+        return new string(array);
+    }
+    private string Decode(string strDecode)
+    {
+        string text = "";
+        for (int i = 0; i < strDecode.Length / 4; i++)
+        {
+            text += (char)short.Parse(strDecode.Substring(i * 4, 4), NumberStyles.HexNumber);
+        }
+        return text;
+    }
+    public DataSet PlanData(DataSet dsSource, string strTableName, string strFields)
+    {
+        for (int i = 0; i < dsSource.Tables[strTableName].Rows.Count; i++)
+        {
+            for (int j = 0; j < dsSource.Tables[strTableName].Columns.Count; j++)
+            {
+                if (dsSource.Tables[strTableName].Rows[i][j].ToString().Trim() != "")
+                {
+                    if (strFields.IndexOf(dsSource.Tables[strTableName].Columns[j].ColumnName + "|") >= 0)
+                    {
+                        dsSource.Tables[strTableName].Rows[i][j] = this.Decode(this.Reverse(dsSource.Tables[strTableName].Rows[i][j].ToString().Trim().Substring(5)));
+                    }
+                }
+            }
+        }
+        return dsSource;
+    }
+
+    private void button3_Click(object sender, System.EventArgs e)
+    {
+        ListViewItem item = new ListViewItem();
+        item.Text = textBox1.Text;
+        item.SubItems.Add(comboBox1.Text);
+        item.SubItems.Add(comboBox2.Text);
+            listView1.Items.Add(item);
     }
     }
 
